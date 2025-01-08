@@ -24,11 +24,15 @@ two agents play in turn, and one agent don't receive immediate feedback after on
 maybe you are interested about afterstate
 """
 
+import tensorflow as tf
+from tensorflow.keras import layers, models
+import numpy as np
+
 
 class chessBoard:
     def __init__(self, size):
         self.size = size
-        self.board_array = [[None] * size for i in range(size)]  # state
+        self.board_array = np.array([[None] * size for i in range(size)])  # state
         self.turn = 0
 
     def check(self):
@@ -59,6 +63,7 @@ class agentPlayer:
         self.env = env
         self.policy = policy
         self.char = char
+        self.model = self.build_model((self.env.size, self.env.size), (1, 3))
 
     def play(self, state):
         bestAction = None
@@ -73,8 +78,22 @@ class agentPlayer:
 
         self.env.board_array[bestAction[0]][bestAction[1]] = self.char
 
-    def reward(self, state, action):  # critical
-        pass
+    def build_model(state_shape, action_shape):
+        input_shape = (state_shape[0] + action_shape[0], state_shape[1])
+        model = models.Sequential()
+        model.add(layers.Flatten(input_shape=input_shape))
+        model.add(layers.Dense(128, activation="relu"))
+        model.add(layers.Dense(64, activation="relu"))
+        model.add(layers.Dense(1, activation="linear"))
+        model.compile(optimizer="adam", loss="mse")
+        return model
+
+    def reward(self, state, action):
+        model = self.model
+        # Assuming state and action are numpy arrays
+        input_data = np.concatenate((state.flatten().reshape(1, -1), action))
+        reward = model.predict(input_data)
+        return reward[0][0]
 
     # def value(self, state, action):
 

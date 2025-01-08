@@ -10,12 +10,12 @@ two agents, placing piece in turn, O or X
 
 environment: 3x3 array as chess board
 
+goal: win the game, have three continuous placement, horizontal, vertical, or diagonal
+
 | X |   |   |
 | - | - | - |
 | X | O | O |
 | X |   |   |
-
-goal: win the game, have three continuous placement, horizontal, vertical, or diagonal
 
 state: situation of 3x3 chess board, each slot is empty (None) or X or O
 
@@ -38,6 +38,12 @@ clone this repo, and run `cli.py` with your python
 ## Tools Used
 
 simple python, no framework
+
+## Todo
+
+tensorflow gpu acceleration?
+
+https://www.tensorflow.org/install/gpu?hl=zh-cn
 
 ## Reference
 
