@@ -27,6 +27,7 @@ maybe you are interested about afterstate
 import tensorflow as tf
 from tensorflow.keras import layers, models
 import numpy as np
+import random
 
 
 class chessBoard:
@@ -59,23 +60,15 @@ class chessBoard:
 
 
 class agentPlayer:
-    def __init__(self, env, policy, char):
+    def __init__(self, env, char, epsilon):
         self.env = env
-        self.policy = policy
+        # self.policy = policy
         self.char = char
         self.model = self.build_model((self.env.size, self.env.size), (1, 3))
+        self.epsilon = epsilon
 
     def play(self, state):
-        bestAction = None
-        maxReward = 0
-        for i, j in [[[i, j] for j in range(self.size)] for i in range(self.size)]:
-            action = [i, j, self.char]
-            if self.isValid(self.env.board_array, action):
-                reward = self.reward(self.env.board_array, action)
-                if reward > maxReward:
-                    maxReward = reward
-                    bestAction = action
-
+        bestAction = self.actionTaken(self.env.board_array)
         self.env.board_array[bestAction[0]][bestAction[1]] = self.char
 
     def build_model(state_shape, action_shape):
@@ -95,18 +88,51 @@ class agentPlayer:
         reward = model.predict(input_data)
         return reward[0][0]
 
+    def actionTaken(self, state):  # policy
+        bestAction = None
+        maxReward = 0
+
+        self.valid_actions = self.validActions(state)
+        if random.random() < self.epsilon:
+            return random.choice(self.valid_actions)
+        else:
+            for action in self.valid_actions:
+                reward = self.reward(state, action)
+                if reward > maxReward:
+                    maxReward = reward
+                    bestAction = action
+            return bestAction
+
     # def value(self, state, action):
 
     def isValid(self, state, action):
         return True if state[action[0]][action[1]] else False
 
+    def validActions(self, state):
+        valid_actions = []
+        for i in range(self.size):
+            for j in range(self.size):
+                if not state[i][j]:
+                    action = [i, j, self.char]
+                    valid_actions.append(action)
+
+        return valid_actions
+
+    def update(self, result):  # TODO
+        if result == "tie":  # change a little
+            pass
+        elif result == self.char:  # keep going
+            pass
+        else:  # change
+            pass
+
 
 class Game:
     def __init__(self):
         self.chess_board = chessBoard(3)
-        init_policy = None
-        self.player1 = agentPlayer(self.chess_board, init_policy, "X")
-        self.player2 = agentPlayer(self.chess_board, init_policy, "O")
+        # init_policy = None
+        self.player1 = agentPlayer(self.chess_board, "X", 0.1)
+        self.player2 = agentPlayer(self.chess_board, "O", 0.1)
 
     def run(self):
         self.hello()
@@ -114,8 +140,9 @@ class Game:
             print(f"turn: {self.chess_board.turn}")
             self.player1.play(self.chess_board.board_array)
             self.chess_board.print_board()
-            check = self.chess_board.check()
-            self.check_gameover(check)
+            check_gameover = self.chess_board.check()
+            if check_gameover:
+                self.gameover(check_gameover)
 
             if self.chess_board.isFull():
                 print("tie!")
@@ -123,8 +150,40 @@ class Game:
 
             self.player2.play(self.chess_board.board_array)
             self.chess_board.print_board()
-            check = self.chess_board.check()
-            self.check_gameover(check)
+            check_gameover = self.chess_board.check()
+            if check_gameover:
+                self.gameover(check_gameover)
+
+    def practise(self, epoch):  # train model
+        for i in range(epoch):
+            print("-" * 20)
+            print(f"practise epoch {i}")
+            while True:
+                print(f"turn: {self.chess_board.turn}")
+                self.player1.play(self.chess_board.board_array)
+                # self.chess_board.print_board()
+                check_gameover = self.chess_board.check()
+                if check_gameover:
+                    self.player1.update(check_gameover)
+                    self.player2.update(check_gameover)
+                    break
+                    # self.gameover(check_gameover)
+
+                if self.chess_board.isFull():
+                    self.player1.update("tie")
+                    self.player2.update("tie")
+                    break
+                    # print("tie!")
+                    # exit()
+
+                self.player2.play(self.chess_board.board_array)
+                # self.chess_board.print_board()
+                check_gameover = self.chess_board.check()
+                if check_gameover:
+                    self.player1.update(check_gameover)
+                    self.player2.update(check_gameover)
+                    break
+                    # self.gameover(check_gameover)
 
     def hello(self):
         print(f"tic tac toe game started!")
@@ -134,9 +193,18 @@ class Game:
             print(f"game over! the winner is {check}")
             exit()
 
+    def gameover(self, winner):
+        print(f"game over! the winner is {winner}")
+        exit()
+
+    def winner(self, check):
+        if check:
+            return check
+
 
 def main():
     mygame = Game()
+    mygame.practise()
     mygame.run()
 
 
