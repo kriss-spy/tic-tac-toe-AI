@@ -12,16 +12,16 @@ class RLParams:
     eval_games: int = 100  # Number of games for each evaluation
 
     # Learning parameters
-    learning_rate: float = 0.1  # How quickly the agent learns (0 to 1)
+    learning_rate: float = 0.2  # How quickly the agent learns (0 to 1)
     initial_epsilon: float = 0.5  # Starting exploration rate (0 to 1)
     min_epsilon: float = 0.01  # Minimum exploration rate
     epsilon_decay: float = 0.999  # Decay rate for exploration
 
     # Reward structure
     win_reward: float = 1.0  # Reward for winning
-    draw_reward: float = 0.5  # Reward for draw
+    draw_reward: float = 0.7  # Reward for draw
     lose_reward: float = -1.0  # Reward for losing
-    living_reward: float = 0.0  # Reward for non-terminal moves
+    living_reward: float = 0.0  # Reward for non-terminal moves # Don't touch it!
 
 
 class TicTacToe:
@@ -216,7 +216,7 @@ def train_and_plot(params: RLParams):
 
     plt.tight_layout()
     # plt.show()
-    plt.savefig("dev/visualization/visualization.png")
+    plt.savefig("dev/visualization/just-works-1.png")
 
     return game
 
@@ -244,7 +244,6 @@ if __name__ == "__main__":
 
     # Print parameters being used
     print_params(params)
-
     # Init evaluation
     print("\nInit evaluation...")
     init_results = evaluate_performance(TicTacToe(params), num_games=1000)
