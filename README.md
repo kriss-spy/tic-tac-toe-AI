@@ -41,6 +41,13 @@ simple python, no framework
 
 ## Todo
 
+cli test without RL
+
+
+test with RL
+
+
+
 tensorflow gpu acceleration?
 
 https://www.tensorflow.org/install/gpu?hl=zh-cn

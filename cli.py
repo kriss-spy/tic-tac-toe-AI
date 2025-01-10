@@ -71,6 +71,11 @@ class agentPlayer:
         bestAction = self.actionTaken(self.env.board_array)
         self.env.board_array[bestAction[0]][bestAction[1]] = self.char
 
+    def random_play(self, state):
+        self.valid_actions = self.validActions(state)
+        action = random.choice(self.valid_actions)
+        self.env.board_array[action[0]][action[1]] = self.char
+
     def build_model(state_shape, action_shape):
         input_shape = (state_shape[0] + action_shape[0], state_shape[1])
         model = models.Sequential()
@@ -154,6 +159,26 @@ class Game:
             if check_gameover:
                 self.gameover(check_gameover)
 
+    def random_run(self):
+        self.hello()
+        while True:
+            print(f"turn: {self.chess_board.turn}")
+            self.player1.random_play(self.chess_board.board_array)
+            self.chess_board.print_board()
+            check_gameover = self.chess_board.check()
+            if check_gameover:
+                self.gameover(check_gameover)
+
+            if self.chess_board.isFull():
+                print("tie!")
+                exit()
+
+            self.player2.random_play(self.chess_board.board_array)
+            self.chess_board.print_board()
+            check_gameover = self.chess_board.check()
+            if check_gameover:
+                self.gameover(check_gameover)
+
     def practise(self, epoch):  # train model
         for i in range(epoch):
             print("-" * 20)
@@ -208,7 +233,10 @@ def main():
     mygame.run()
 
 
-# def test():
+def test_without_RL():
+    mygame = Game()
+    mygame.random_run()
+
 
 # test()
 # main()
