@@ -24,6 +24,8 @@ two agents play in turn, and one agent don't receive immediate feedback after on
 maybe you are interested about afterstate
 """
 
+# refer to doc/how-to-implement-reward
+
 import tensorflow as tf
 from tensorflow.keras import layers, models
 import numpy as np
@@ -105,9 +107,9 @@ class agentPlayer:
         model.compile(optimizer="adam", loss="mse")
         return model
 
-    def reward(self, state, action):
+    def reward(self, state, action):  # is this actual RL?
         model = self.model
-        # Assuming state and action are numpy arrays
+        # state and action are numpy arrays
         action[:2] = action[:2].astype(int)
         input_data = np.concatenate((state.flatten(), action)).reshape(1, -1)
         input_data = np.where(input_data == None, 0, input_data)
@@ -165,6 +167,15 @@ class Game:
         # init_policy = None
         self.player1 = agentPlayer(self.chess_board, "X", 0.5)
         self.player2 = agentPlayer(self.chess_board, "O", 0.5)
+        self.Xwins = 0
+        self.Owins = 0
+        self.ties = 0
+
+    def init_state_agents(self):
+        self.chess_board = chessBoard(3)
+        # init_policy = None
+        self.player1 = agentPlayer(self.chess_board, "X", 0.5)
+        self.player2 = agentPlayer(self.chess_board, "O", 0.5)
 
     def run(self):
         self.hello()
@@ -187,6 +198,7 @@ class Game:
                 self.gameover(check_gameover)
 
             self.chess_board.turn += 1
+            print()
 
     def random_run(self):
         self.hello()
@@ -209,8 +221,9 @@ class Game:
                 self.gameover(check_gameover)
 
             self.chess_board.turn += 1
+            print()
 
-    def practise(self, epoch):  # train model
+    def practise(self, epoch):  # train model # TODO
         for i in range(epoch):
             print("=" * 20)
             print(f"practise epoch {i}")
@@ -242,6 +255,56 @@ class Game:
                     # self.gameover(check_gameover)
 
                 self.chess_board.turn += 1
+                print()
+
+    def compare(self, epoch):
+        print("compare start!")
+        for i in range(epoch):
+            print("=" * 20)
+            print(f"epoch {i}")
+            while True:
+                # print(f"turn: {self.chess_board.turn}")
+                self.player1.play(self.chess_board.board_array)
+                # self.chess_board.print_board()
+                check_gameover = self.chess_board.check()
+                if check_gameover:
+                    # self.player1.update(check_gameover)
+                    # self.player2.update(check_gameover)
+                    print(f"the winner is {check_gameover}")
+                    self.Xwins += 1
+                    break
+                    # self.gameover(check_gameover)
+
+                if self.chess_board.isFull():
+                    # self.player1.update("tie")
+                    # self.player2.update("tie")
+                    print("tie")
+                    self.ties += 1
+                    break
+                    # print("tie!")
+                    # exit()
+                # print("-" * 10)
+                self.player2.play(self.chess_board.board_array)
+                # self.chess_board.print_board()
+                check_gameover = self.chess_board.check()
+                if check_gameover:
+                    # self.player1.update(check_gameover)
+                    # self.player2.update(check_gameover)
+                    print(f"the winner is {check_gameover}")
+                    self.Owins += 1
+                    break
+                    # self.gameover(check_gameover)
+
+                self.chess_board.turn += 1
+                # print()
+            self.init_state_agents()
+        self.print_wins_and_ties()
+
+    def print_wins_and_ties(self):
+        total = self.Xwins + self.Owins + self.ties
+        print(f"X wins: {self.Xwins} {self.Xwins/total}")
+        print(f"O wins: {self.Owins} {self.Owins/total}")
+        print(f"ties: {self.ties} {self.ties/total}")
 
     def hello(self):
         print(f"tic tac toe game started!")
@@ -276,6 +339,12 @@ def test_without_train():
     mygame.run()
 
 
-test_without_train()
+def compare():
+    mygame = Game()
+    mygame.compare(10)
+
+
+compare()
+# test_without_train()
 # test_without_RL()
 # main()

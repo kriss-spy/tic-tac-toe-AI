@@ -1,0 +1,266 @@
+# refer to claude-3.5-sonnet
+
+import numpy as np
+import random
+
+
+class ChessBoard:
+    def __init__(self, size):
+        self.size = size
+        self.board_array = np.array([[None] * size for _ in range(size)])
+        self.turn = 0
+
+    def check(self):
+        # Check rows, columns, and diagonals for a win
+        for i in range(self.size):
+            if self.board_array[i][0] and len(set(self.board_array[i])) == 1:
+                return self.board_array[i][0]
+            if (
+                self.board_array[0][i]
+                and len(set([row[i] for row in self.board_array])) == 1
+            ):
+                return self.board_array[0][i]
+        if (
+            self.board_array[0][0]
+            and len(set([self.board_array[i][i] for i in range(self.size)])) == 1
+        ):
+            return self.board_array[0][0]
+        if (
+            self.board_array[0][self.size - 1]
+            and len(
+                set([self.board_array[i][self.size - 1 - i] for i in range(self.size)])
+            )
+            == 1
+        ):
+            return self.board_array[0][self.size - 1]
+        return None
+
+    def is_full(self):
+        return all(all(cell is not None for cell in row) for row in self.board_array)
+
+    def get_valid_actions(self):
+        return [
+            (i, j)
+            for i in range(self.size)
+            for j in range(self.size)
+            if self.board_array[i][j] is None
+        ]
+
+
+class Agent:
+    def __init__(self, char, epsilon=0.1, alpha=0.1, gamma=0.9):
+        self.char = char
+        self.initial_epsilon = epsilon
+        self.epsilon = epsilon
+        self.alpha = alpha
+        self.gamma = gamma
+        self.q_table = {}
+
+    def get_state_key(self, state, current_player):
+        # Include the current player in the state representation
+        return (tuple(map(tuple, state)), current_player)
+
+    def choose_action(self, state, valid_actions, current_player):
+        if random.random() < self.epsilon:
+            return random.choice(valid_actions)
+
+        state_key = self.get_state_key(state, current_player)
+        q_values = [
+            self.q_table.get((state_key, action), 0) for action in valid_actions
+        ]
+
+        max_q = max(q_values)
+        best_actions = [
+            action for i, action in enumerate(valid_actions) if q_values[i] == max_q
+        ]
+        return random.choice(best_actions)
+
+    def update_q_value(
+        self, state, action, reward, next_state, current_player, next_player, game_over
+    ):
+        state_key = self.get_state_key(state, current_player)
+        next_state_key = self.get_state_key(next_state, next_player)
+
+        if game_over:
+            next_max = 0
+        else:
+            valid_actions = [
+                (i, j)
+                for i in range(len(next_state))
+                for j in range(len(next_state[i]))
+                if next_state[i][j] is None
+            ]
+            if valid_actions:
+                next_max = max(
+                    [self.q_table.get((next_state_key, a), 0) for a in valid_actions]
+                )
+            else:
+                next_max = 0
+
+        current_q = self.q_table.get((state_key, action), 0)
+        self.q_table[(state_key, action)] = current_q + self.alpha * (
+            reward + self.gamma * next_max - current_q
+        )
+
+    def decay_epsilon(self, episode, total_episodes):
+        # Implement epsilon decay
+        self.epsilon = self.initial_epsilon * (1 - episode / total_episodes)
+
+
+class Game:
+    def __init__(self):
+        self.chess_board = ChessBoard(3)
+        self.player1 = Agent("X", epsilon=1.0)  # Random player
+        self.player2 = Agent("O", epsilon=0.1)  # RL agent
+        self.results = {"X": 0, "O": 0, "tie": 0}
+
+    def train(self, episodes=1000):
+        for episode in range(episodes):
+            self.chess_board = ChessBoard(3)
+            # Decay epsilon for the RL agent
+            self.player2.decay_epsilon(episode, episodes)
+
+            while True:
+                # X's turn (random player)
+                current_state = np.copy(self.chess_board.board_array)
+                valid_actions = self.chess_board.get_valid_actions()
+                action = self.player1.choose_action(current_state, valid_actions, "X")
+                self.chess_board.board_array[action[0]][action[1]] = self.player1.char
+
+                winner = self.chess_board.check()
+                is_full = self.chess_board.is_full()
+
+                if winner or is_full:
+                    reward = 1 if winner == "X" else (0 if is_full else -1)
+                    self.player2.update_q_value(
+                        current_state,
+                        action,
+                        reward,
+                        self.chess_board.board_array,
+                        "X",
+                        "O",
+                        True,
+                    )
+                    if winner:
+                        self.results[winner] += 1
+                    else:
+                        self.results["tie"] += 1
+                    break
+
+                # O's turn (RL agent)
+                current_state = np.copy(self.chess_board.board_array)
+                valid_actions = self.chess_board.get_valid_actions()
+                action = self.player2.choose_action(current_state, valid_actions, "O")
+                self.chess_board.board_array[action[0]][action[1]] = self.player2.char
+
+                winner = self.chess_board.check()
+                is_full = self.chess_board.is_full()
+
+                if winner or is_full:
+                    reward = 1 if winner == "O" else (0 if is_full else -1)
+                    self.player2.update_q_value(
+                        current_state,
+                        action,
+                        reward,
+                        self.chess_board.board_array,
+                        "O",
+                        "X",
+                        True,
+                    )
+                    if winner:
+                        self.results[winner] += 1
+                    else:
+                        self.results["tie"] += 1
+                    break
+                else:
+                    # Update Q-value for non-terminal states
+                    self.player2.update_q_value(
+                        current_state,
+                        action,
+                        0,
+                        self.chess_board.board_array,
+                        "O",
+                        "X",
+                        False,
+                    )
+
+    def test(self, episodes=100):
+        # Save and set epsilon to 0 for testing (pure exploitation)
+        original_epsilon = self.player2.epsilon
+        self.player2.epsilon = 0
+        self.results = {"X": 0, "O": 0, "tie": 0}
+
+        for _ in range(episodes):
+            self.chess_board = ChessBoard(3)
+            while True:
+                # X's turn (random player)
+                valid_actions = self.chess_board.get_valid_actions()
+                action = self.player1.choose_action(
+                    self.chess_board.board_array, valid_actions, "X"
+                )
+                self.chess_board.board_array[action[0]][action[1]] = self.player1.char
+
+                winner = self.chess_board.check()
+                if winner or self.chess_board.is_full():
+                    if winner:
+                        self.results[winner] += 1
+                    else:
+                        self.results["tie"] += 1
+                    break
+
+                # O's turn (RL agent)
+                valid_actions = self.chess_board.get_valid_actions()
+                action = self.player2.choose_action(
+                    self.chess_board.board_array, valid_actions, "O"
+                )
+                self.chess_board.board_array[action[0]][action[1]] = self.player2.char
+
+                winner = self.chess_board.check()
+                if winner or self.chess_board.is_full():
+                    if winner:
+                        self.results[winner] += 1
+                    else:
+                        self.results["tie"] += 1
+                    break
+
+        # Restore original epsilon
+        self.player2.epsilon = original_epsilon
+
+    def print_results(self):
+        total_games = sum(self.results.values())
+        print(f"Total Games Played: {total_games}")
+        print(f"X Wins: {self.results['X']} ({self.results['X']/total_games*100:.2f}%)")
+        print(f"O Wins: {self.results['O']} ({self.results['O']/total_games*100:.2f}%)")
+        print(
+            f"Ties: {self.results['tie']} ({self.results['tie']/total_games*100:.2f}%)"
+        )
+
+
+if __name__ == "__main__":
+    game = Game()
+    print("Training...")
+    game.train(episodes=100000)
+    print("\nTraining Results:")
+    game.print_results()
+
+    print("\nTesting...")
+    game.test(episodes=1000)
+    print("\nTest Results:")
+    game.print_results()
+
+# BUG
+# Training...
+
+# Training Results:
+# Total Games Played: 100000
+# X Wins: 60248 (60.25%)
+# O Wins: 37843 (37.84%)
+# Ties: 1909 (1.91%)
+
+# Testing...
+
+# Test Results:
+# Total Games Played: 1000
+# X Wins: 610 (61.00%)
+# O Wins: 380 (38.00%)
+# Ties: 10 (1.00%)

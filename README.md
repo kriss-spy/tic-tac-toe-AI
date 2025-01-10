@@ -1,4 +1,4 @@
-# tic-tac-toe-AI
+# tic-tac-toe-AI (WIP)
 
 simple RL project to play tic tac toe game in cli
 
@@ -43,10 +43,7 @@ simple python, no framework
 
 cli test without RL
 
-
 test with RL
-
-
 
 tensorflow gpu acceleration?
 
