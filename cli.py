@@ -29,6 +29,10 @@ from tensorflow.keras import layers, models
 import numpy as np
 import random
 
+import os
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # Suppress TensorFlow logging
+
 
 class chessBoard:
     def __init__(self, size):
@@ -37,47 +41,62 @@ class chessBoard:
         self.turn = 0
 
     def check(self):
+        # horizontal
         for i in range(self.size):
             if self.board_array[i][0] and len(set(self.board_array[i])) == 1:
                 return self.board_array[i][0]
+        # vertical
         for i in range(self.size):
-            if self.board_array[0][i] and len(
-                set([row[i] for row in self.board_array]) == 1
+            if (
+                self.board_array[0][i]
+                and len(set([row[i] for row in self.board_array])) == 1
             ):
                 return self.board_array[0][i]
+        # diagonal
+        tmp1 = set()
+        tmp2 = set()
+        for i in range(self.size):
+            tmp1.add(self.board_array[i][i])
+            tmp2.add(self.board_array[i][self.size - 1 - i])
+        if self.board_array[0][0] and len(tmp1) == 1:
+            return self.board_array[0][0]
+        if self.board_array[0][self.size - 1] and len(tmp2) == 1:
+            return self.board_array[0][self.size - 1]
 
     def print_board(self):
         for i in range(self.size):
+            line = ""
             for j in range(self.size):
-                print(
-                    self.board_array[i][j] if self.board_array[i][j] else " ", end=" "
-                )
+                line += self.board_array[i][j] if self.board_array[i][j] else " "
+                line += "|"
 
-            print()
+            print(line[:-1])
 
     def isFull(self):
-        return all(self.board_array)
+        return self.board_array.all()
 
 
 class agentPlayer:
     def __init__(self, env, char, epsilon):
         self.env = env
+        self.state = self.env.board_array
         # self.policy = policy
         self.char = char
-        self.model = self.build_model((self.env.size, self.env.size), (1, 3))
+        self.model = self.build_model(self.state.shape, (1, 3))
         self.epsilon = epsilon
 
     def play(self, state):
-        bestAction = self.actionTaken(self.env.board_array)
-        self.env.board_array[bestAction[0]][bestAction[1]] = self.char
+        bestAction = self.actionTaken(self.state)
+        self.env.board_array[int(bestAction[0])][int(bestAction[1])] = self.char
 
     def random_play(self, state):
         self.valid_actions = self.validActions(state)
         action = random.choice(self.valid_actions)
-        self.env.board_array[action[0]][action[1]] = self.char
+        self.env.board_array[int(action[0])][int(action[1])] = self.char
 
-    def build_model(state_shape, action_shape):
+    def build_model(self, state_shape, action_shape):
         input_shape = (state_shape[0] + action_shape[0], state_shape[1])
+        input_shape = (input_shape[0] * input_shape[1], 1)
         model = models.Sequential()
         model.add(layers.Flatten(input_shape=input_shape))
         model.add(layers.Dense(128, activation="relu"))
@@ -89,17 +108,25 @@ class agentPlayer:
     def reward(self, state, action):
         model = self.model
         # Assuming state and action are numpy arrays
-        input_data = np.concatenate((state.flatten().reshape(1, -1), action))
-        reward = model.predict(input_data)
+        action[:2] = action[:2].astype(int)
+        input_data = np.concatenate((state.flatten(), action)).reshape(1, -1)
+        input_data = np.where(input_data == None, 0, input_data)
+        input_data = np.where(input_data == "X", 1, input_data)
+        input_data = np.where(input_data == "O", -1, input_data)
+        input_data[0][-3] = int(input_data[0][-3])
+        input_data[0][-2] = int(input_data[0][-2])
+        input_data = input_data.astype(np.float32)  # tf uses float32!
+        reward = model.predict(input_data, verbose=0)
         return reward[0][0]
 
     def actionTaken(self, state):  # policy
         bestAction = None
-        maxReward = 0
+        maxReward = float("-inf")
 
         self.valid_actions = self.validActions(state)
         if random.random() < self.epsilon:
-            return random.choice(self.valid_actions)
+            bestAction = random.choice(self.valid_actions)
+            return bestAction
         else:
             for action in self.valid_actions:
                 reward = self.reward(state, action)
@@ -115,10 +142,10 @@ class agentPlayer:
 
     def validActions(self, state):
         valid_actions = []
-        for i in range(self.size):
-            for j in range(self.size):
+        for i in range(self.env.size):
+            for j in range(self.env.size):
                 if not state[i][j]:
-                    action = [i, j, self.char]
+                    action = np.array([i, j, self.char])
                     valid_actions.append(action)
 
         return valid_actions
@@ -136,8 +163,8 @@ class Game:
     def __init__(self):
         self.chess_board = chessBoard(3)
         # init_policy = None
-        self.player1 = agentPlayer(self.chess_board, "X", 0.1)
-        self.player2 = agentPlayer(self.chess_board, "O", 0.1)
+        self.player1 = agentPlayer(self.chess_board, "X", 0.5)
+        self.player2 = agentPlayer(self.chess_board, "O", 0.5)
 
     def run(self):
         self.hello()
@@ -152,12 +179,14 @@ class Game:
             if self.chess_board.isFull():
                 print("tie!")
                 exit()
-
+            print("-" * 10)
             self.player2.play(self.chess_board.board_array)
             self.chess_board.print_board()
             check_gameover = self.chess_board.check()
             if check_gameover:
                 self.gameover(check_gameover)
+
+            self.chess_board.turn += 1
 
     def random_run(self):
         self.hello()
@@ -172,16 +201,18 @@ class Game:
             if self.chess_board.isFull():
                 print("tie!")
                 exit()
-
+            print("-" * 10)
             self.player2.random_play(self.chess_board.board_array)
             self.chess_board.print_board()
             check_gameover = self.chess_board.check()
             if check_gameover:
                 self.gameover(check_gameover)
 
+            self.chess_board.turn += 1
+
     def practise(self, epoch):  # train model
         for i in range(epoch):
-            print("-" * 20)
+            print("=" * 20)
             print(f"practise epoch {i}")
             while True:
                 print(f"turn: {self.chess_board.turn}")
@@ -200,7 +231,7 @@ class Game:
                     break
                     # print("tie!")
                     # exit()
-
+                print("-" * 10)
                 self.player2.play(self.chess_board.board_array)
                 # self.chess_board.print_board()
                 check_gameover = self.chess_board.check()
@@ -209,6 +240,8 @@ class Game:
                     self.player2.update(check_gameover)
                     break
                     # self.gameover(check_gameover)
+
+                self.chess_board.turn += 1
 
     def hello(self):
         print(f"tic tac toe game started!")
@@ -238,5 +271,11 @@ def test_without_RL():
     mygame.random_run()
 
 
-# test()
+def test_without_train():
+    mygame = Game()
+    mygame.run()
+
+
+test_without_train()
+# test_without_RL()
 # main()
